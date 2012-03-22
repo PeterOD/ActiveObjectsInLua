@@ -1,0 +1,8 @@
+*******************************************
+ACTIVE OBJECTS IN LUA
+*******************************************
+
+Implements per thread objects.
+Asynchronous Message Passing.
+Lua object oriented programming (loop) see: http://loop.luaforge.net/
+is used to implement classic object orientation 
