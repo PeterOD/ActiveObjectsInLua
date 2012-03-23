@@ -2,8 +2,16 @@
 #include "ao.h"
 #include <Stdio.h>
 #include <stdlib.h>
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
 
 #define MESSAGE_QUEUE_LIST_SIZE 10000
+
+
+/* global lua state that is used to create messages */
+lua_State *MESSAGE = NULL;
+
 
 struct task_t{
 //	void (*tsk)(void*);
@@ -16,8 +24,8 @@ struct message_t{
 	 struct message_t *N;
 	 struct message_t *P;
 	unsigned int num_of_msgs;
-	task msgs;
-	char id;
+	void *msgs;
+	
 };
 
 struct message_list_t{
@@ -48,9 +56,10 @@ struct in_use_list{
 	int node_count;
 };
 
-/*
+
+/**********************
  * IN_USE_LIST SECTION
- */
+ ***********************/
 
 /* Initialise an empty list */
 list init_list(void){
@@ -189,5 +198,34 @@ void destroy_list(list l){
 
 
 }
+/*************************
+ * MESSAGE SECTION
+ * ***********************/
+
+/* Initialise a message list for message queue*/
+mlist init_message_list(void){
+	mlist m;
+
+	m = (mlist)malloc (sizeof(struct message_list_t));
+
+	if(m == NULL){
+		RAISE_ERROR(" COULD NOT ASSIGN MEMORY");
+		return m;
+	}
+	m->start = NULL;
+	m->end = NULL;
+	m->msg_count = 0;
+
+	return m;
+}
+
+void message_init(void){
+	MESSAGE = luaL_newstate();
+	lua_newtable(MESSAGE);
+	lua_setglobal(MESSAGE,"message");
+}
+/*
+message create_message(char char *code){
 
 
+}*/

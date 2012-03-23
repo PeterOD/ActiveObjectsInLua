@@ -78,7 +78,24 @@ void remove_id(list l, node n);
  * 	Returns: void
  *
  * 	This function destroys the list
- */ 	
- void destroy_list(list l);
+ */ 
+void destroy_list(list l);
+
+/*
+ * 	Function: init_message_list
+ *
+ * 	Parameter: void
+ *
+ * 	Returns: mlist
+ *
+ * 	This function initialises a message list
+ */ 
+
+mlist init_message_list(void);
+
+
+
+//message create_message(char char *code);
+
 
 #endif
