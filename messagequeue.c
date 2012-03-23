@@ -111,6 +111,7 @@ node find_id(list l, char *id){
 
 	/* check if list is null or empty */
 	if(l == NULL || l->head == NULL){
+		RAISE_ERROR("Parameters are null");
 		return NULL;
 	}
 	/* loop to check if is present */
@@ -125,7 +126,52 @@ node find_id(list l, char *id){
 	/* id not found */
 	return NULL;
 }
+/* remove id from list */
+void remove_id(list l, node n){
+	node iterator;
 
+
+	/*check if parameters are null or empty */
+	if((l == NULL) ||(n == NULL) || (l->head == NULL) ){
+		RAISE_ERROR("Parameters are null/Empty");
+		return;
+	}
+
+	if(l->head == n){
+		l->head = n->next;
+
+		if(l->tail == n){
+			l->tail = n->next;
+		}
+		else{
+			l->head->prev = NULL;
+		}
+		free(n);
+		l->node_count--;
+		return;
+	}
+
+	/* id not found in head node therefore search list */
+	for(iterator = l->head->next; iterator != l->tail; iterator = iterator -> next){
+		if(iterator == n){
+			n->prev->next = n->next;
+			n->next->prev = n->prev;
+			free(n);
+			l->node_count--;
+			return;
+		}
+	}
+	/* finally! check if node is tail node */
+	if(l->tail == n){
+		l->tail = n->prev;
+		n->prev->next = n->next;
+		free(n);
+		return;
+	}
+
+	return;
+
+}
 
 
 

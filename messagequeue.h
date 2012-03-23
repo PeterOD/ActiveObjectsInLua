@@ -56,4 +56,19 @@ node add_id(list l, node n);
  * 	This function searches for an id in the list
  */
 node find_id(list l, char *id);
+
+/*
+ * 	Function:	remove_id
+ *
+ * 	Parameters:	list l, node n
+ *
+ * 	returns:	void
+ *
+ * 	This function removes a node from the in_use_list. This is done
+ * 	because the object with the id being removed is no longer in use
+ */
+
+void remove_id(list l, node n);
+
+
 #endif
