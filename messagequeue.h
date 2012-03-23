@@ -70,5 +70,15 @@ node find_id(list l, char *id);
 
 void remove_id(list l, node n);
 
+/*
+ * 	Function: destroy_list
+ *
+ * 	Parameter: list l
+ *
+ * 	Returns: void
+ *
+ * 	This function destroys the list
+ */ 	
+ void destroy_list(list l);
 
 #endif

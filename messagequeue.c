@@ -176,4 +176,18 @@ void remove_id(list l, node n){
 
 
 
+void destroy_list(list l){
+	if(l == NULL){
+	RAISE_ERROR("Attempted to destroy empty list");
+		return;
+	}
+
+	while(l->head !=NULL){
+		remove_id(l,l->head);
+	}
+	free(l);
+
+
+}
+
 
