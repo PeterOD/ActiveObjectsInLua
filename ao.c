@@ -123,4 +123,24 @@ void Kill_Thread(AO_THREAD_T *ao){
     PT_CALL( pthread_cond_broadcast(ref) );     // wake up ALL waiting threads
   }
 
+void Create_Thread(AO_THREAD_T *ao, THREAD_RETURN_T (*func)(void *),void *data, int priority){
+	pthread_attr_t _a;
+	pthread_attr_t *a = &_a;
+
+	int rc = pthread_create(ao,a,func,data);
+
+	if(rc){ _PT_FAIL(rc,"pthread_create()",__FILE__,__LINE__-1);}
+
+
+	if(a){
+		PT_CALL(pthread_attr_destroy(a));
+	}
+	
+
+
+
+}
+
+
+
 #endif

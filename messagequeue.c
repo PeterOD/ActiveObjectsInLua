@@ -9,6 +9,7 @@
 #define MESSAGE_QUEUE_LIST_SIZE 10000
 #define QUEUE_ACCESS 3
 #define QUEUE_ACCESS_FAIL -1
+#define MESSAGE_DESTROYED  3
 
 
 /* global lua state that is used to create messages */
@@ -346,5 +347,91 @@ message append (mlist m, message msg){
 
 }
 
+void remove_msg(mlist mlst, message m){
+		message iterator;
 
 
+	/*check if parameters are null or empty */
+	if((mlst == NULL) ||(m == NULL) || (mlst->start == NULL) ){
+		RAISE_ERROR("Parameters are null/Empty");
+		return;
+	}
+
+	if(mlst->start == m){
+		mlst->start = m->N;
+
+		if(mlst->end == m){
+			mlst->end = m->N;
+		}
+		else{
+			mlst->start->P = NULL;
+		}
+		free(m);
+		mlst->msg_count--;
+		return;
+	}
+
+	/* id not found in head node therefore search list */
+	for(iterator = 	mlst->start->N; iterator != mlst->end; iterator = iterator -> N){
+		if(iterator == m){
+			m->P->N = m->N;
+			m->N->P = m->P;
+			free(m);
+			mlst->msg_count--;
+			return;
+		}
+	}
+	/* finally! check if node is tail node */
+	if(mlst->end == m){
+		m->P = m->P;
+		m->P->N = m->N;
+		free(m);
+		return;
+	}
+
+	return;
+
+}
+
+void del_mlist(mlist m){
+	if(m == NULL){
+		return;
+	}
+	while(m->start != NULL){
+		remove_msg(m,m->start);
+	}
+	free(m);
+
+}
+
+int destroy_message(mlist m, const char *mid){
+	Lock_Mutex(message_state_mutex);
+
+	del_mlist(m);
+
+	lua_getglobal(MESSAGE,"message");
+	lua_pushstring(MESSAGE,mid);
+	lua_pushnil(MESSAGE);
+	lua_settable(MESSAGE,-3);
+	lua_pop(MESSAGE,1);
+
+	Unlock_Mutex(message_state_mutex);
+	
+	return MESSAGE_DESTROYED;
+	
+}
+message first_node(mlist m){
+	if(m->start != NULL){
+		return m->start;
+	}
+
+	return NULL;
+
+}
+
+message get_next(message m){
+	if(m->N != NULL){
+		return m->N;
+	}
+	return NULL;
+}
