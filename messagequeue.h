@@ -1,3 +1,4 @@
+
 #ifndef MESSAGEQUEUE_H
 #define MESSAGEQUEUE_H
 
@@ -94,8 +95,24 @@ void destroy_list(list l);
 mlist init_message_list(void);
 
 
+/*
+  Function: create_message
 
-//message create_message(char char *code);
+  Parameters: const char *code, const char *mid
 
+  returns: message
 
+  This function creates a new message
+*/
+message create_message(const char *code,const char *mid);
+
+message get_message(const char *mid);
+
+const char *get_msg_id(message m);
+
+mlist init_mlist(void);
+
+message mlist_append(mlist m, message msg);
+
+message append (mlist m, message msg);
 #endif

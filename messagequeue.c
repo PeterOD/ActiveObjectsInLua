@@ -7,11 +7,14 @@
 #include "lualib.h"
 
 #define MESSAGE_QUEUE_LIST_SIZE 10000
+#define QUEUE_ACCESS 3
+#define QUEUE_ACCESS_FAIL -1
 
 
 /* global lua state that is used to create messages */
 lua_State *MESSAGE = NULL;
-
+AO_MUTEX_T message_state_mutex;
+AO_MUTEX_T mlist_access_mutex;
 
 struct task_t{
 //	void (*tsk)(void*);
@@ -24,7 +27,8 @@ struct message_t{
 	 struct message_t *N;
 	 struct message_t *P;
 	unsigned int num_of_msgs;
-	void *msgs;
+ const char  *m_id;
+  void *msgs;
 	
 };
 
@@ -109,7 +113,7 @@ node add_id(list l, node n){
 	
 	}
 
-	l->node_count;	
+	l->node_count++;	
 	return n;
 }
 
@@ -224,8 +228,123 @@ void message_init(void){
 	lua_newtable(MESSAGE);
 	lua_setglobal(MESSAGE,"message");
 }
-/*
-message create_message(char char *code){
+
+message create_message(const char *code,const char *mid){
+  message m;
+  Lock_Mutex(message_state_mutex);
+
+  lua_getglobal(MESSAGE,"message");
+  lua_pushstring(MESSAGE,code);
+  /* 
+     lua_newuserdata; see : http://pgl.yoyo.org/luai/i/lua_newuserdata
+  */
+  m = (message)lua_newuserdata(MESSAGE,sizeof(struct message_t));
+  m-> N = (message)malloc(sizeof(struct message_t));
+  if(m->N == NULL){
+    RAISE_ERROR("Could not assign memory for struct message_t *N");
+  }
+  m->P = (message)malloc(sizeof(struct message_t));
+   if(m->P == NULL){
+    RAISE_ERROR("Could not assign memory for struct message_t *N");
+  }
+   m->num_of_msgs = 0;
+   m->msgs = NULL;
+   m->m_id = mid;
+   
+   lus_settable(MESSAGE,-3);
+   lua_pop(MESSAGE,1);
+
+   Unlock_Mutex(message_state_mutex);
+   return m;
+}
+
+message get_message(const char *mid){
+  message m;
+
+  Lock_Mutex(message_state_mutex);
+
+  /* search for the message on the stack */
+  lua_getglobal(MESSAGE,"message");
+  /* -1 index is for top of stack? */
+  lua_getfield(MESSAGE,-1,mid);
+
+  if((lua_type(MESSAGE, -1 )) == LUA_TUSERDATA  ){
+    m = (message)lua_touserdata(MESSAGE,-1);
+ }
+  else{
+    m = NULL;
+  }
+
+  lua_pop(MESSAGE,2);
+  Unlock_Mutex(message_state_mutex);
+
+  return m;
+  
+  
+}
+const char *get_msg_id(message m){
+
+  return m->m_id;
+}
+
+/**************************************************************
+ * MESSAGE LIST SECTION (list that contains messages for queue)
+ **************************************************************/
+
+mlist init_mlist(void){
+  mlist mlst;
+
+  mlst = (mlist)malloc(sizeof(struct message_list_t));
+  if(mlst == NULL){
+    return mlst;
+  }
+  mlst -> start = NULL;
+  mlst -> end = NULL;
+  mlst -> msg_count = 0;
+  return mlst;
+
+}
+
+message mlist_append(mlist m, message msg){
+  /* 
+     confirm if mutex lock should be part of message_list_t struct
+     or 'global' lock
+     note: on 25/3/12 'global' was chosen before confirmation 
+  */
+  
+  /* get access to list */
+	Lock_Mutex(mlist_access_mutex);
+
+	return append(m,msg);
+
+	Unlock_Mutex(mlist_access_mutex);
 
 
-}*/
+
+}
+
+message append (mlist m, message msg){
+  /* will have to be modified as messages are
+     lua_userdata?? */
+  /* check if parameters are null */
+  if(m == NULL || msg == NULL){
+    return NULL;
+  }
+
+  if(m -> start == NULL){
+    m->start = msg;
+    m->end = msg;
+  }
+  else{
+    m->end->N = msg;
+    msg -> P = m -> end;
+    m->end = msg;
+  }
+
+  m->msg_count++;
+  return msg;
+
+}
+
+
+
