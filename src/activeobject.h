@@ -17,6 +17,8 @@ object create_object(const char *id, void *code);
  **********************/
 static int ao_create_object(lua_State *L);
 
+object create_object(const char *id, void *data);
+
 
 /* child functions i.e. object.create_message("foo") */
 static int ao_create_message(lua_State *L);
