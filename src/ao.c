@@ -88,11 +88,34 @@ void Create_Thread(AO_THREAD_T *ao, THREAD_RETURN_T(__stdcall *func)( void *),vo
 }//end of Create_Thread (win)
 
 void Kill_Thread(AO_THREAD_T *ao){
-	if(!TerminatedThread(*ao,0)){
+	if(!TerminateThread(*ao,0)){
 		printf("Thread Failed to terminate", GetLastError());
 	}
 	*ao = NULL;
 }
+
+
+void SIGNAL_INIT(SIGNAL_T *ao){
+	HANDLE h = CreateEvent( NULL,TRUE,FALSE,NULL);
+	if(h == NULL){
+		fprintf("win cond fail ", GetLastError());
+	}
+	*ao = h;
+}
+
+void SIGNAL_FREE(SIGNAL_T *ao){
+	if(! CloseHandle (*ao)){
+		fprintf("failed CloseHandle",GetLastError());
+	}
+	*ao = NULL;
+}
+
+void SIGNAL_ALL(SIGNAL_T *ao){
+	if(!PulseEvent(*ao)){
+		fprintf("Pulse Event",GetLastError);
+	}
+}
+
 #else
 	/* Linux Stuff*/
 	#include <errno.h>
@@ -112,6 +135,7 @@ void Kill_Thread(AO_THREAD_T *ao){
   //
   void SIGNAL_INIT( SIGNAL_T *ao ) {
     PT_CALL( pthread_cond_init(ao,NULL /*attr*/) );
+    
     }
   void SIGNAL_FREE( SIGNAL_T *ao ) {
     PT_CALL( pthread_cond_destroy(ao) );

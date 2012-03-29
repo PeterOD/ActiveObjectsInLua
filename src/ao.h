@@ -39,7 +39,7 @@ typedef unsigned int uint_t;
 	
 	This is an enumeration of the status of threads
 */
-	enum status {RUNNING,WAITING,DONE,ERROR_T};
+	/* enum status {RUNNING,WAITING,DONE,ERROR_T}; */
 	
 /*
 	==== LOCKS AND SIGNALS ===
