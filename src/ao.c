@@ -42,7 +42,7 @@ THE SOFTWARE.
 #if (defined PLATFORM_WIN32) || (defined PLATFORM_POCKETPC)
 	void Mutex_Init(AO_MUTEX_T *ao){
 		*ao= CreateMutex( NULL /*security attr*/, FALSE /*not locked*/, NULL );
-		if (ao == NULL){
+		if (!ao){
 			printf("CreateMutex error: %d\n", GetLastError());
        			
 		}
@@ -85,7 +85,7 @@ void Create_Thread(AO_THREAD_T *ao, THREAD_RETURN_T(__stdcall *func)( void *),vo
 	
 	}
 	*ao = h;
-}//end of Create_Thread (win)
+}/*end of Create_Thread (win)*/
 
 void Kill_Thread(AO_THREAD_T *ao){
 	if(!TerminateThread(*ao,0)){
@@ -98,21 +98,21 @@ void Kill_Thread(AO_THREAD_T *ao){
 void SIGNAL_INIT(SIGNAL_T *ao){
 	HANDLE h = CreateEvent( NULL,TRUE,FALSE,NULL);
 	if(h == NULL){
-		fprintf("win cond fail ", GetLastError());
+		printf("win cond fail ", GetLastError());
 	}
 	*ao = h;
 }
 
 void SIGNAL_FREE(SIGNAL_T *ao){
 	if(! CloseHandle (*ao)){
-		fprintf("failed CloseHandle",GetLastError());
+		printf("failed CloseHandle",GetLastError());
 	}
 	*ao = NULL;
 }
 
 void SIGNAL_ALL(SIGNAL_T *ao){
 	if(!PulseEvent(*ao)){
-		fprintf("Pulse Event",GetLastError);
+		printf("Pulse Event",GetLastError());
 	}
 }
 
@@ -125,14 +125,14 @@ void SIGNAL_ALL(SIGNAL_T *ao){
                      (rc==EPERM) ? "EPERM" :
                      (rc==ENOMEM) ? "ENOMEM" :
                      (rc==ESRCH) ? "ESRCH" :
-                     //...
+                    
                      "";
     fprintf( stderr, "%s %d: %s failed, %d %s\n", file, line, name, rc, why );
     abort();
   }
   
    #define PT_CALL( call ) { int rc= call; if (rc!=0) _PT_FAIL( rc, #call, __FILE__, __LINE__ ); }
-  //
+  
   void SIGNAL_INIT( SIGNAL_T *ao ) {
     PT_CALL( pthread_cond_init(ao,NULL /*attr*/) );
     
@@ -141,10 +141,10 @@ void SIGNAL_ALL(SIGNAL_T *ao){
     PT_CALL( pthread_cond_destroy(ao) );
   }
   void SIGNAL_ONE( SIGNAL_T *ref ) {
-    PT_CALL( pthread_cond_signal(ref) );     // wake up ONE (or no) waiting thread
+    PT_CALL( pthread_cond_signal(ref) );     /* wake up ONE (or no) waiting thread*/
   }
   void SIGNAL_ALL( SIGNAL_T *ref ) {
-    PT_CALL( pthread_cond_broadcast(ref) );     // wake up ALL waiting threads
+    PT_CALL( pthread_cond_broadcast(ref) );     /* wake up ALL waiting threads */
   }
 
 void Create_Thread(AO_THREAD_T *ao, THREAD_RETURN_T (*func)(void *),void *data, int priority){

@@ -1,4 +1,5 @@
 #include "ao.h"
+#include "future.h"
 #include "in_use.h"
 #include "message.h"
 #include "lua.h"
@@ -35,6 +36,9 @@ struct active_object{
 	
 	const char *name;
 	void *data;	
+	int nargs;
+	ao_thread_status_t status;
+	future fut;
 
 };
 object create_object(const char *id, void *data){
@@ -51,6 +55,9 @@ object create_object(const char *id, void *data){
 
 	o->name = id;
 	o-> data = data;
+	o-> nargs = 0;
+	o->status = object_thread_idle;
+	o->fut = create_future(id,data);
 
 	/* have code to open lua standard library 
 	 * e.g. function: open_libraries(shared); ??

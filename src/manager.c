@@ -5,14 +5,23 @@
 #include "activeobject.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <assert.h>
+#include <errno.h>
+#include <math.h>
+#include <stdarg.h>
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
-
+/*********************************/
 /* message queue access */
 AO_MUTEX_T queue_access;
-
+/*
+#if defined (PLATFORM_WIN32) || defined (PLATFORM_POCKETPC)
+	Mutex_Init(&queue_access);
+#else
+	Mutex_Init(&queue_access);
+#endif
+*/
 /* conditonal to wake thread */
 SIGNAL_T wake_thread;
 
@@ -22,7 +31,7 @@ int empty_list = 0;
 
 list active_tasks;
 mlist message_queue;
-
+/********************************/
 #if defined(PLATFORM_WIN32) || defined (PLATFORM_POCKETPC)
 
 	#include <windows.h>
@@ -46,6 +55,26 @@ int get_num_cores(){
 #endif
 
 }
+#if defined(PLATFORM_WIN32) || defined (PLATFORM_POCKERPC)
+	static THREAD_RETURN_T __stdcall thread_loop(void *args)
+#else
+	 static THREAD_RETURN_T thread_loop(void *args)
+#endif
+{
+	message m;
+	object o;
+	int status;
+	int kill_worker;
+	/* worker thread loop */
+	while(1){
+	/*get access to message queue */
+	Lock_Mutex(&queue_access);
+	
+	}
+	
+	return 0;
+
+} /* end of thread_loop */
 
 
 int init_manager(int initial_thread_count){
@@ -61,7 +90,7 @@ int init_manager(int initial_thread_count){
 	/*create initial threads*/
 	initial_thread_count = get_num_cores();
 	for(startup = 0; startup < initial_thread_count; startup++){
-		Create_Thread(&worker,NULL,thread_loop,NULL);
+		Create_Thread(&worker,NULL,thread_loop,2);
 		thread_count++;
 	}
 	
@@ -74,10 +103,12 @@ int init_manager(int initial_thread_count){
 
 }
 
+
+
 int create_worker(void){
 
 	AO_THREAD_T worker;
-	Create_Thread(&worker,NULL,thread_loop,NULl);
+	Create_Thread(&worker,NULL,thread_loop,2);
 	
 	return AO_MANAGET_INIT;
 

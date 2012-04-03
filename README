@@ -4,5 +4,6 @@ ACTIVE OBJECTS IN LUA
 
 Implements per thread objects.
 Asynchronous Message Passing.
-Lua object oriented programming (loop) see: http://loop.luaforge.net/
-is used to implement classic object orientation 
+
+This project aims to implements per thread objects in lua. The aim of this project 
+is to provide a method of concurrent programming in lua.

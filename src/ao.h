@@ -64,8 +64,7 @@ typedef unsigned int uint_t;
 		Parameters: AO_MUTEX_T *ao
 		
 		This function will be used to initialise a mutex lock
-		note: this is not used for setting a lock in lua code
-		see <Lua_Set_lock(AO_State *s)>
+		
 	*/
 	void Mutex_Init(AO_MUTEX_T *ao);
 	#define MUTEX_RECURSIVE_INIT(ao) Mutex_Init(ao)
