@@ -46,7 +46,7 @@ node Create_Node( char *id){
 	return n;
 }
 
-/* Add am id to the in use list note: this is not appended */
+/* Add an id to the in use list  */
 node add_id(list l, node n){
 	/* check if parameters are null*/
 	if(l ==NULL || n == NULL){
@@ -138,9 +138,6 @@ void remove_id(list l, node n){
 
 }
 
-
-
-
 void destroy_list(list l){
 	if(l == NULL){
 	RAISE_ERROR("Attempted to destroy empty list");
@@ -153,4 +150,19 @@ void destroy_list(list l){
 	free(l);
 
 
+}
+
+void kill_node(node n){
+	if(n != NULL){
+		free(n);
+		n= NULL;
+	}
+	RAISE_ERROR("Could not delete node ");
+}
+
+void in_use_count(list l){
+	if(l != NULL){
+		return l->node_count;
+	}
+	return -1;
 }

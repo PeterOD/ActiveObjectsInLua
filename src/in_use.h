@@ -74,4 +74,22 @@ void remove_id(list l, node n);
  */ 
 void destroy_list(list l);
 
+/*
+	Function: kill_node
+	
+	Paramters: n - node to be deleted
+	
+	This function deletes a node's memory
+*/
+void kill_node(node n);
+
+/*
+	Function: in_use_count
+	
+	Paramters: l - list 
+	
+
+*/
+void in_use_count(list l);
+
 #endif

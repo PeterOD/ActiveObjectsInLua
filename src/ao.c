@@ -164,7 +164,9 @@ void Create_Thread(AO_THREAD_T *ao, THREAD_RETURN_T (*func)(void *),void *data, 
 
 
 }
-
+void Kill_Thread(AO_THREAD_T *ao){
+	pthread_cancel(*ao);
+}
 
 
 #endif

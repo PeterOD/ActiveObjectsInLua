@@ -38,7 +38,7 @@ mlist init_list(void);
 	This function creates a new message and pushes it
 	onto stack
 */
-message create_message(char *id, void *data);
+message create_message(const char *id, void *data);
 
 /*
  
@@ -54,7 +54,7 @@ int delete_message(message m, char *id);
 
 /*
  
-   	Function:       get_id
+   	Function:       get_msg_id
 
 	Parameters:	m - message to delete
 			
@@ -62,7 +62,7 @@ int delete_message(message m, char *id);
 	returns:	* char
 
 */
-char *get_id(message m);
+char *get_msg_id(message m);
 
 /*
  
@@ -153,11 +153,58 @@ void destroy_message_list(mlist list);
 
 	returns:	message_count
 
-
-
 */
-
 
 int get_msg_count(mlist list);
 
+/*
+ 
+   	Function:       peek
+
+	Parameters:	list - message list
+			
+			
+
+	returns:	first message in list
+
+*/
+message peek(mlist m);
+
+/*
+ 
+   	Function:       peek_next
+
+	Parameters:	m - message 
+			
+			
+
+	returns:	next message in list
+
+*/
+message peek_next(message m);
+
+/*
+ 
+   	Function:       message_code
+
+	Parameters:	m - message 
+			
+			
+
+	returns:	code in message
+
+*/
+void *message_code(message m);
+
+/*
+	Function:	pop_message
+	
+	Parameters:	m - message list
+	
+	returns:	the first message in the message list and
+				descreases the number of messages in the list
+*/
+message pop_message(mlist m);
+
 #endif
+

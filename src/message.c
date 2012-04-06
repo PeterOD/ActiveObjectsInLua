@@ -51,7 +51,7 @@ mlist init_list(void){
 /*Full Userdata, can be extended with metatables 
  * 	http://pgl.yoyo.org/luai/i/lua_newuserdata
  */
-message create_message(char *id, void *data){
+message create_message(const char *id, void *data){
   message m;
 
   Lock_Mutex(&message_mutex);
@@ -59,7 +59,7 @@ message create_message(char *id, void *data){
   m = (message)lua_newuserdata(MESSAGE,sizeof( struct message_t));
   if(m != NULL){
     lua_pushfstring(MESSAGE,MSG "%s",id);
-    m->id = id;
+    strcpy(m->id,id);
     m->data =data;
   
     m->N =NULL;
@@ -70,7 +70,7 @@ message create_message(char *id, void *data){
     Unlock_Mutex(&message_mutex);
     return m;
   }else{
-    luaL_typeerror(MESSAGE,m,MSG);
+    luaL_typerror(MESSAGE,1,MSG);
     Unlock_Mutex(&message_mutex);
     return m;
   }
@@ -81,7 +81,9 @@ int delete_message(message m, char *id){
   Lock_Mutex(&message_mutex);
   if(m != NULL){
     free(m->N);
+	m->N=NULL;
     free(m->P);
+	m->P=NULL;
   }else{
     return 1;
   }
@@ -98,7 +100,7 @@ int delete_message(message m, char *id){
 }
 
 /* return a messages' object id */
-char *get_id(message m){
+char *get_msg_id(message m){
 	if(m != NULL){
 		return m->id;
 	}
@@ -219,6 +221,7 @@ void destroy_message_list(mlist list){
 		remove_message(list,list->start);
 	}
 	free(list);
+	list = NULL;
 
 }
 
@@ -228,4 +231,52 @@ int get_msg_count(mlist list){
 	}
 	RAISE_ERROR("Error -- message count cannot be found (-1) returned");
 	return -1;
+}
+message peek(mlist m){
+	if(! m){
+		RAISE_ERROR("cannot return message");
+		return NULL;
+	}
+	return m->start;
+}
+
+message peek_next(message m){
+	if(! m){
+		RAISE_ERROR("cannot return message");
+		return NULL;
+	}
+	return m->N;
+}
+void *message_code(message m){
+	if(m==NULL){
+		RAISE_ERROR("message code cannot be returned");
+		return NULL;
+	}
+	return m->data;
+}
+
+message pop_message(mlist m){
+	message temp_message;
+	
+	/* sanity check of parameter */
+	if((m==NULL)||(m->start == NULL)){
+		return NULL;
+	}
+	
+	temp_message = m->start;
+	if(m->start == m-> end){
+		/* one message in list */
+		m->start = NULL;
+		m->end = NULL;
+	}
+	else{
+		m->start = temp_message -> N;
+		/*remove previous 'node' */
+		temp_message->N->P = NULL;
+	}
+	temp_message->N = NULL;
+	temp_message->P = NULL;
+	m->message_count--;
+	return temp_message;
+
 }

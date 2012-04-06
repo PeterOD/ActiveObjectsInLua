@@ -2,6 +2,7 @@
 #include "future.h"
 #include "in_use.h"
 #include "message.h"
+#include "manager.h"
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
@@ -12,6 +13,12 @@
 #include "activeobject.h"
 
 #define OBJECT_CREATION_ERROR -1
+#define IGNORE_TOP_STK_INDEX 2
+
+
+
+
+
 
 /* message mutex*/
 AO_MUTEX_T message_mutex;
@@ -37,8 +44,11 @@ struct active_object{
 	const char *name;
 	void *data;	
 	int nargs;
-	ao_thread_status_t status;
+	/*AO_THREAD_T obj_thread;*/
+	 ao_thread_status_t status;
 	future fut;
+	message m;
+	lua_State *ostate;
 
 };
 object create_object(const char *id, void *data){
@@ -57,26 +67,43 @@ object create_object(const char *id, void *data){
 	o-> data = data;
 	o-> nargs = 0;
 	o->status = object_thread_idle;
-	o->fut = create_future(id,data);
+	o->fut = create_future((char*)id,data);
+	o->m = create_message(id,data);
+	o->ostate = shared;
 
-	/* have code to open lua standard library 
-	 * e.g. function: open_libraries(shared); ??
-	 */
+	/* load base libraries */
+	luaL_openlibs(o->ostate);
 
-	/*
-	 * @TODO add child functions for object 
-	 * ask does object have to create worker thread */
+	
 
 	/* load data to be executed */
 	const char *code = (const char *) o->data;
-	int ret_val = luaL_loadstring(shared, code);
+	int ret_val = luaL_loadstring(o->ostate, code);
 	if(ret_val != 0){
-		lua_close(shared);
+		lua_close(o->ostate);
 		return  NULL;
 	}
 	Unlock_Mutex(&state_mutex);
 	
 	return o;
+}
+
+int get_obj_args(object o){
+	return o->nargs;
+
+}
+lua_State *obj_state(object o){
+	if(o != NULL){
+		return o->ostate;
+	}
+
+}
+void reset(object o, int rst){
+	if(o != NULL){
+		o->nargs = rst;
+	}
+	RAISE_ERROR("null object");
+	return;
 }
 static int ao_create_object(lua_State *L){
 	
@@ -125,6 +152,61 @@ static int ao_create_message(lua_State *L){
 	return 1;
 
 }
+
+void set_obj_status(object o, int stat){
+	o->status = stat;
+}
+int get_obj_status(object o){
+	if(o != NULL){
+		return o->status;
+	}
+	RAISE_ERROR("cannot get status of object");
+}
+
+static int create_obj_worker(lua_State *L){
+	if(create_worker() != AO_MANAGET_INIT){
+		lua_pushnil(L);
+		lua_pushstring(L,"Unable to create kernel thread");
+		return 2; /* no of items returned from stack */
+	}
+	lua_pushboolean(L,TRUE);
+	return 1;
+
+}
+
+void enqueue_object_message(object o){
+	Lock_Mutex(&message_mutex);
+	
+	append_helper(message_queue,o->m);
+	Unlock_Mutex(&message_mutex);
+}
+
+/* move values to lua stack in future structure */
+void save_values(lua_State *from, lua_State *to){
+	int idx;
+	/*size of stack */
+	int num_args = lua_gettop(from);
+	for(idx = IGNORE_TOP_STK_INDEX; idx<= num_args; idx++){
+			lua_pushstring(to,lua_tostring(from,idx));
+
+		}	
+}
+
+/* return the current object contained in the shared state */
+object return_object(lua_State *L){
+	object o;
+	/* allow exclusive access to stack functions */
+	Lock_Mutex(&state_mutex);
+	lua_getfield(L,LUA_REGISTRYINDEX, "__self__");
+	o = (object)lua_touserdata(L,-1); /* (-1) refers to top of stack */
+	lua_pop(L,1);
+	unlock_Mutex(&state_mutex);
+	return o;
+}
+
+/*******************************************
+*	Registration
+*******************************************/
 
 /* registration array for active objects */
 static const struct luaL_reg ao_main_functions[] = {

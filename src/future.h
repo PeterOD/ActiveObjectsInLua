@@ -1,7 +1,11 @@
 #ifndef FUTURE_H
 #define FUTURE_H
 #include "ao.h"
+#include "message.h"
+#include "lua.h"
 typedef struct future_t *future;
+
+
 
 /*meta table of future*/
 //static const char future_tab[] = "__futureTab";
@@ -26,7 +30,7 @@ future init_future(void);
 	
 	
 */
-future create_future(const char *id, void *code);
+future create_future(char *id, void *code);
 
 /*
 	Function:	is_done
@@ -76,7 +80,11 @@ bool_t check_status(future f);
 	
 	
 */
-future add_to_future(future f, const char* id, void *code);
+future add_to_future(  char* id, void *code, lua_State *L);
+
+char *fut_id(future f);
+
+void kill_future(future f);
 
 
 #endif
