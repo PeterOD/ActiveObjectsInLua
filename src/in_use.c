@@ -160,9 +160,15 @@ void kill_node(node n){
 	RAISE_ERROR("Could not delete node ");
 }
 
-void in_use_count(list l){
+int in_use_count(list l){
 	if(l != NULL){
 		return l->node_count;
 	}
 	return -1;
+}
+char *in_id(node n){
+	if(n != NULL){
+		return n->id;
+	}
+	RAISE_ERROR("NODE EMPTY -- could not find id");
 }

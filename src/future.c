@@ -107,3 +107,6 @@ void kill_future(future f){
 	free(f);
 
 }
+lua_State *get_fut(future f){
+	return f->fut;
+}

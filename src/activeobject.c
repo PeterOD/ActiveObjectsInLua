@@ -91,6 +91,7 @@ static const struct luaL_reg ao_main_functions[] = {
 static const struct luaL_reg ao_child_functions[] = {
 	{"createMessage",ao_create_message},
 	{"NewKernelWorker",ao_kernel_worker},
+	{"ExecuteMessage",ao_exec},
 	{NULL,NULL}
 };
 
@@ -266,7 +267,101 @@ static int ao_queue_size(lua_State *L){
 	return lua_tonumber(L,n);
 }
 
+static int function_ready(lua_State *L, message m){
+	if(m == NULL){
+		RAISE_ERROR("Cannot execute code -- message is NULL:  %s",get_msg_id(m));
+	}
+	
+	lua_pushlightuserdata(L,message_code(m));
+	/* push code onto LUA_REGISTRYINDEX see: http://www.lua.org/pil/27.3.1.html */
+	lua_gettable(L,LUA_REGISTRYINDEX);
+	/* push id onto stack */
+	lua_pushstring(L,get_msg_id(m));
+	lua_gettable(L,-2);
+	if(! lua_isfunction(L,-1)){
+		int status;
+		/* remove from top of stack */
+		lua_pop(L,1);
+		status = luaL_loadbuffer(L,message_code(m),strlen(message_code(m)),message_code(m));
+		if(status != 0){
+			
+			lua_remove(L,-2);
+			return status;
+		}
+		
+		lua_pushliteral(L,"active_object_env");
+		lua_gettable(L,LUA_REGISTRYINDEX);
+		if (m == NULL){
+			lua_pushliteral(L,"message_code");
+		}
+		else{
+			lua_pushlightuserdata(L,message_code(m));
+		}
+		lua_gettable(L,-2);
+		if(!lua_isnil(L,-1)){
+			/* http://pgl.yoyo.org/luai/i/lua_setfenv */
+			lua_setfenv(L,-3);
+			lua_pop(L,-1);
+		}
+		else{
+			/* pop 2 items from table */
+			lua_pop(L,2);
+		}
+		
+	}
+	lua_remove(L,-2);
+	return 0;
+	
+}
 
+static int do_stuff(lua_State *shared, message m, int index){
+	int base;
+	future f = create_future(get_msg_id(m),message_code(m));
+	
+	const char *code = luaL_checkstring(shared,index);
+	lua_gettable(shared, LUA_REGISTRYINDEX);
+	lua_State * temp = get_fut(f);
+	base = lua_gettop(temp); 
+	index = index +1;
+	Lock_Mutex(&state_mutex);
+	if(function_ready(temp,m)== 0){
+		int arg_num = lua_gettop(shared);
+		add_to_future(get_msg_id(m),message_code(m),temp);
+		arg_num = arg_num-index+1;
+		if(lua_pcall(temp,arg_num,LUA_MULTRET,base)== 0){
+			int ret_val = lua_gettop(get_fut(f));
+			lua_pushboolean(shared,1);
+			lua_xmove(get_fut(f),shared,ret_val);
+			/* return this number from stack */
+			ret_val = ret_val-base+1;
+			lua_pop(shared,ret_val);
+			return 1+(ret_val-base);
+		}
+	
+	}
+	Unlock_Mutex(&state_mutex);
+	lua_pushboolean(shared,0);
+	lua_pushstring(shared,lua_tostring(get_fut(f),-1));
+	lua_pop(get_fut(f),2);
+	return 2;
+}
+
+static int ao_exec(lua_State *L){
+	
+	lua_gettable(L,LUA_REGISTRYINDEX);
+	lua_pop(L,1);
+	Lock_Mutex(&message_mutex);
+	message m = peek(message_queue);
+	Lock_Mutex(&list_mutex);
+	node n = find_in_id(active,get_msg_id(m));
+	Unlock_Mutex(&list_mutex);
+	if(in_id(n) == get_msg_id(m)){
+		m = peek_next(m);
+	}
+	
+	
+	return do_stuff(L,m,1);
+}
 
 int luaopen_activeobject(lua_State *L){
 	

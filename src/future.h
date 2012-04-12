@@ -8,7 +8,7 @@ typedef struct future_t *future;
 
 
 /*meta table of future*/
-//static const char future_tab[] = "__futureTab";
+/*static const char future_tab[] = "__futureTab";*/
 
 /*
 	Function:	init_future
@@ -85,6 +85,8 @@ future add_to_future(  char* id, void *code, lua_State *L);
 char *fut_id(future f);
 
 void kill_future(future f);
+
+lua_State *get_fut(future f);
 
 
 #endif

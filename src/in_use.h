@@ -90,6 +90,8 @@ void kill_node(node n);
 	
 
 */
-void in_use_count(list l);
+int in_use_count(list l);
+
+char *in_id(node n);
 
 #endif

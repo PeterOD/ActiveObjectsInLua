@@ -26,6 +26,12 @@ AO_MUTEX_T in_use_mutex;
 
 /* mutex to decrement thread_count*/
 AO_MUTEX_T thread_count_mutex;
+
+/* mutex to exit manager (join threads) */
+AO_MUTEX_T act_mutex;
+
+
+
 lua_State *L;
 
 
@@ -40,7 +46,7 @@ lua_State *L;
 
 
 /* conditonal to wake thread */
-SIGNAL_T wake_thread;
+SIGNAL_T *wake_thread;
 
 #if defined (PLATFORM_LINUX)
 	/*conditional to allow the thread count of ZERO to be broadcast */
@@ -51,7 +57,7 @@ SIGNAL_T wake_thread;
 
 int active_count = 0;
 
-int empty_list = 0;
+int empty_list = FALSE;
 
 list active_tasks;
 mlist message_queue;
@@ -261,4 +267,18 @@ void object_count_incr(void){
 	Lock_Mutex(&thread_count_mutex);
 	active_count++;
 	Unlock_Mutex(&thread_count_mutex);
+}
+void join_threads_to_exit(void){
+	Lock_Mutex(&act_mutex);
+	int mcnt = get_msg_count(message_queue);
+	int icnt = in_use_count(active_tasks);
+	if((mcnt == 0) && (icnt == 0)){
+		Lock_Mutex(&queue_access);
+		empty_list = TRUE;
+		SIGNAL_ALL(&wake_thread);
+		Unlock_Mutex(&queue_access);
+		
+	}
+	Unlock_Mutex(&act_mutex);
+	
 }
