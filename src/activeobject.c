@@ -37,6 +37,28 @@ list active;
 /* global message queue that holds tasks */
 mlist message_queue;
 
+#if defined(PLATFORM_WIN32) || defined (PLATFORM_POCKETPC)
+
+	#include <windows.h>
+#elif defined(PLATFORM_LINUX)
+	
+	#include <unistd.h>
+#endif
+
+int get_num_cores(){
+
+#if defined(PLATFORM_WIN32) || defined (PLATFORM_POCKETPC)
+	SYSTEM_INFO info;
+	GetSystemInfo(&info);
+	return info.dwNumberOfProcessors;
+
+#else
+
+
+	return sysconf(_SC_NPROCESSORS_ONLN);	
+#endif
+}
+
 
 /* active object */
 struct active_object{
@@ -244,9 +266,19 @@ static int ao_queue_size(lua_State *L){
 	return lua_tonumber(L,n);
 }
 
+
+
 int luaopen_activeobject(lua_State *L){
 	
 	luaL_register(L,"activeobject",ao_main_functions);
+	
+	int initial = get_num_cores();
+	/* initialise the manager */
+	init_manager(initial);
+
+	/* create in_use list and message queue */	
+	active = init_in_list();
+	message_queue = init_list();
 	
 	return 0;
 }

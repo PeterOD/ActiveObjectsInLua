@@ -125,7 +125,10 @@ int get_num_cores(){
 		/* if coroutine was executed successfully */
 		if(status == 0){
 			/* code has been executed so remove from in_use list */
+			Lock_Mutex(&in_use_mutex);
 			kill_node(n);
+			Unlock_Mutex(&in_use_mutex);
+
 			
 			/*set object status to done*/
 			set_obj_status(o,object_thread_done);
@@ -146,6 +149,7 @@ int get_num_cores(){
 			if(get_obj_status(o) == object_thread_waiting){
 				/* add code and id to future */
 				 f = create_future(get_msg_id(m),message_code(m));
+				 f = add_to_future(get_msg_id(m),message_code(m),(lua_State *)obj_state(o));
 		#if defined (PLATFORM_LINUX)		
 			SIGNAL_ONE(&no_tasks);
 		#else
@@ -153,7 +157,9 @@ int get_num_cores(){
 
 		#endif
 				/* destroy node stored on in_use list */
+				Lock_Mutex(&in_use_mutex);
 				kill_node(n);
+				Unlock_Mutex(&in_use_mutex);
 			}
 			else{
 				/* thread has yielded re-insert into message queue
@@ -167,8 +173,9 @@ int get_num_cores(){
 					}
 					
 				/* destroying node on in_use list does not destroy message*/
+				Lock_Mutex(&in_use_mutex);
 				kill_node(n);
-				
+				Unlock_Mutex(&in_use_mutex);				
 				append_helper(message_queue,m);
 				Unlock_Mutex(&queue_access);
 			
@@ -176,16 +183,21 @@ int get_num_cores(){
 		}
 		else{
 			/* check for lua side errors - run time, syntax etc this is bad*/
+			Lock_Mutex(&in_use_mutex);
 			kill_node(n);
+			Unlock_Mutex(&in_use_mutex);
 			if(fut_id){
 				kill_future(f);
 			}
+			Lock_Mutex(&queue_access);
 			remove_message(message_queue,m);
+			Unlock_Mutex(&queue_access);
 			/*get access to shared lua state */
 			Lock_Mutex(&state_access);
 			
 			lua_close((lua_State*)obj_state(o));
 			Unlock_Mutex(&state_access);
+			/* decrement amount of active objects */
 			object_count();
 		}
 	}
@@ -205,8 +217,8 @@ int init_manager(int initial_thread_count){
 	active_tasks = init_in_list();
 	message_queue = init_list();
 	
-	/*create initial threads*/
-	initial_thread_count = get_num_cores();
+	
+
 	for(startup = 0; startup < initial_thread_count; startup++){
 		Create_Thread(&worker,NULL,thread_loop,2);
 		thread_count++;
