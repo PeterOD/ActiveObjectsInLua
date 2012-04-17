@@ -1,9 +1,9 @@
 #ifndef MANAGER_H
 #define MANAGER_H
-#include "ao.h"
+
 #include "in_use.h"
 
-
+typedef void * THREAD_RETURN_T;
 
 
 #define AO_MANAGET_INIT 0

@@ -206,5 +206,7 @@ void *message_code(message m);
 */
 message pop_message(mlist m);
 
+message get_message(char *id);
+
 #endif
 

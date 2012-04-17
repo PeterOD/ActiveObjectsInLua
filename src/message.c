@@ -1,5 +1,5 @@
 
-#include "ao.h"
+//#include "ao.h"
 #include "message.h"
 #include <stdlib.h>
 #include <stdio.h>
@@ -9,6 +9,7 @@
 #include "lauxlib.h"
 #include "lualib.h"
 #include "lua.h"
+#include <pthread.h>
 
 #define MSG "message_"
 
@@ -18,7 +19,7 @@
 lua_State *MESSAGE = NULL;
 
   /*mutex for state*/
-  AO_MUTEX_T message_mutex;
+  pthread_mutex_t message_mutex = PTHREAD_MUTEX_INITIALIZER;
 struct message_t{
   char *id;
   void *data;
@@ -54,31 +55,31 @@ mlist init_list(void){
 message create_message(const char *id, void *data){
   message m;
 
-  Lock_Mutex(&message_mutex);
+  pthread_mutex_lock(&message_mutex);
   MESSAGE = luaL_newstate();
   m = (message)lua_newuserdata(MESSAGE,sizeof( struct message_t));
   if(m != NULL){
     lua_pushfstring(MESSAGE,MSG "%s",id);
     strcpy(m->id,id);
-    m->data =data;
+        m->data =data;
   
     m->N =NULL;
     m->P=NULL;
     lua_settable(MESSAGE,-3);
     lua_pop(MESSAGE,1);
 
-    Unlock_Mutex(&message_mutex);
+    pthread_mutex_unlock(&message_mutex);
     return m;
   }else{
     luaL_typerror(MESSAGE,1,MSG);
-    Unlock_Mutex(&message_mutex);
+    pthread_mutex_unlock(&message_mutex);
     return m;
   }
 
 }
 
 int delete_message(message m, char *id){
-  Lock_Mutex(&message_mutex);
+  pthread_mutex_lock(&message_mutex);
   if(m != NULL){
     free(m->N);
 	m->N=NULL;
@@ -94,7 +95,7 @@ int delete_message(message m, char *id){
   lua_settable(MESSAGE,-3);
    lua_pop(MESSAGE,1);
 
- Unlock_Mutex(&message_mutex);
+ pthread_mutex_unlock(&message_mutex);
  return 0;
 
 }
@@ -105,6 +106,7 @@ char *get_msg_id(message m){
 		return m->id;
 	}
 	RAISE_ERROR("PARAMETER IS NULL");
+	return NULL;
 }
 
 message append(mlist list, message m){
@@ -129,11 +131,11 @@ message append(mlist list, message m){
 
 }
 message append_helper(mlist list, message m){
-	Lock_Mutex(&message_mutex);
+	pthread_mutex_lock(&message_mutex);
 
 	return append(list,m);
 
-	Unlock_Mutex(&message_mutex);
+	pthread_mutex_unlock(&message_mutex);
 
 }
 
@@ -280,3 +282,5 @@ message pop_message(mlist m){
 	return temp_message;
 
 }
+
+

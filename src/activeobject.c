@@ -1,4 +1,4 @@
-#include "ao.h"
+//#include "ao.h"
 #include "future.h"
 #include "in_use.h"
 #include "message.h"
@@ -11,25 +11,34 @@
 #include <stdarg.h>
 #include <string.h>
 #include "activeobject.h"
+#include <pthread.h>
+
 
 #define OBJECT_CREATION_ERROR -1
 #define IGNORE_TOP_STK_INDEX 2
 
-
+#ifdef _WIN32
+#include <windows.h>
+#elif MACOS
+#include <sys/param.h>
+#include <sys/sysctl.h>
+#else
+#include <unistd.h>
+#endif
 
 
 
 
 /* message mutex*/
-AO_MUTEX_T message_mutex;
+pthread_mutex_t a_message_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* state mutex */
-AO_MUTEX_T state_mutex;
+pthread_mutex_t state_mutex = PTHREAD_MUTEX_INITIALIZER;
 /* shared state */
 lua_State *shared  = NULL;
 
 /* in_use mutex lock */
-AO_MUTEX_T list_mutex;
+pthread_mutex_t list_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /*global in_use list to hold object ids */
 list active;
@@ -37,25 +46,28 @@ list active;
 /* global message queue that holds tasks */
 mlist message_queue;
 
-#if defined(PLATFORM_WIN32) || defined (PLATFORM_POCKETPC)
-
-	#include <windows.h>
-#elif defined(PLATFORM_LINUX)
-	
-	#include <unistd.h>
-#endif
-
-int get_num_cores(){
-
-#if defined(PLATFORM_WIN32) || defined (PLATFORM_POCKETPC)
-	SYSTEM_INFO info;
-	GetSystemInfo(&info);
-	return info.dwNumberOfProcessors;
-
+int get_num_cores() 
+{
+#ifdef WIN32
+    SYSTEM_INFO sysinfo;
+    GetSystemInfo(&sysinfo);
+    return sysinfo.dwNumberOfProcessors;
+#elif MACOS
+    int nm[2];
+    size_t len = 4;
+    uint32_t count;
+ 
+    nm[0] = CTL_HW; nm[1] = HW_AVAILCPU;
+    sysctl(nm, 2, &count, &len, NULL, 0);
+ 
+    if(count < 1) {
+    nm[1] = HW_NCPU;
+    sysctl(nm, 2, &count, &len, NULL, 0);
+    if(count < 1) { count = 1; }
+    }
+    return count;
 #else
-
-
-	return sysconf(_SC_NPROCESSORS_ONLN);	
+    return sysconf(_SC_NPROCESSORS_ONLN);
 #endif
 }
 
@@ -66,7 +78,7 @@ struct active_object{
 	const char *name;
 	void *data;	
 	int nargs;
-	/*AO_THREAD_T obj_thread;*/
+	/*pthread_t obj_thread;*/
 	 ao_thread_status_t status;
 	future fut;
 	message m;
@@ -84,6 +96,7 @@ static const struct luaL_reg ao_main_functions[] = {
 	{"CreateObject",ao_create_object},
 	{"NewKernelWorker",ao_kernel_worker},
 	{"QueueSize",ao_queue_size},
+	{"Close",ao_exit},
 	{NULL,NULL}
 };
 
@@ -92,6 +105,7 @@ static const struct luaL_reg ao_child_functions[] = {
 	{"createMessage",ao_create_message},
 	{"NewKernelWorker",ao_kernel_worker},
 	{"ExecuteMessage",ao_exec},
+	{"Close",ao_exit},
 	{NULL,NULL}
 };
 
@@ -103,7 +117,7 @@ object create_object(const char *id, void *data){
 	object o;
 
 	/* get access to shared lua state */
-	Lock_Mutex(&state_mutex);
+	pthread_mutex_lock(&state_mutex);
 	shared = luaL_newstate();
 
 	/* store the object in shared state ?? */
@@ -130,7 +144,7 @@ object create_object(const char *id, void *data){
 		lua_close(o->ostate);
 		return  NULL;
 	}
-	Unlock_Mutex(&state_mutex);
+	pthread_mutex_unlock(&state_mutex);
 	
 	return o;
 }
@@ -143,6 +157,7 @@ lua_State* obj_state(object o){
 	if(o != NULL){
 		return o->ostate;
 	}
+	return o->ostate;
 
 }
 void reset(object o, int rst){
@@ -175,7 +190,7 @@ static int ao_create_object(lua_State *L){
 /* child function i.e. obj.create_message("foo") */
 static int ao_create_message(lua_State *L){
 
-	//char *param_id = luaL_checkstring(L,1);
+
 	char *param_id = (char *)lua_isstring(L,1);
 	char *param_code =(char *)lua_isstring(L,2);
 	
@@ -190,7 +205,7 @@ static int ao_create_message(lua_State *L){
 		return 2;
 	}
 	/* add message to message queue*/
-	/* @TODO check if queue is inited; yes append, no create then append */
+
 	message_queue = init_list();
 	append_helper(message_queue,new_msg);
 	
@@ -208,24 +223,16 @@ int get_obj_status(object o){
 		return o->status;
 	}
 	RAISE_ERROR("cannot get status of object");
+	return 0;
 }
 
-static int create_obj_worker(lua_State *L){
-	if(create_worker() != AO_MANAGET_INIT){
-		lua_pushnil(L);
-		lua_pushstring(L,"Unable to create kernel thread");
-		return 2; /* no of items returned from stack */
-	}
-	lua_pushboolean(L,TRUE);
-	return 1;
 
-}
 
 void enqueue_object_message(object o){
-	Lock_Mutex(&message_mutex);
+	pthread_mutex_lock(&a_message_mutex);
 	
 	append_helper(message_queue,o->m);
-	Unlock_Mutex(&message_mutex);
+	pthread_mutex_unlock(&a_message_mutex);
 }
 
 /* move values to lua stack in future structure */
@@ -243,11 +250,11 @@ void save_values(lua_State *from, lua_State *to){
 object return_object(lua_State *L){
 	object o;
 	/* allow exclusive access to stack functions */
-	Lock_Mutex(&state_mutex);
+	pthread_mutex_lock(&state_mutex);
 	lua_getfield(L,LUA_REGISTRYINDEX, "__self__");
 	o = (object)lua_touserdata(L,-1); /* (-1) refers to top of stack */
 	lua_pop(L,1);
-	Unlock_Mutex(&state_mutex);
+	pthread_mutex_unlock(&state_mutex);
 	return o;
 }
 
@@ -318,12 +325,12 @@ static int do_stuff(lua_State *shared, message m, int index){
 	int base;
 	future f = create_future(get_msg_id(m),message_code(m));
 	
-	const char *code = luaL_checkstring(shared,index);
+	
 	lua_gettable(shared, LUA_REGISTRYINDEX);
 	lua_State * temp = get_fut(f);
 	base = lua_gettop(temp); 
 	index = index +1;
-	Lock_Mutex(&state_mutex);
+	pthread_mutex_lock(&state_mutex);
 	if(function_ready(temp,m)== 0){
 		int arg_num = lua_gettop(shared);
 		add_to_future(get_msg_id(m),message_code(m),temp);
@@ -339,7 +346,7 @@ static int do_stuff(lua_State *shared, message m, int index){
 		}
 	
 	}
-	Unlock_Mutex(&state_mutex);
+	pthread_mutex_unlock(&state_mutex);
 	lua_pushboolean(shared,0);
 	lua_pushstring(shared,lua_tostring(get_fut(f),-1));
 	lua_pop(get_fut(f),2);
@@ -350,11 +357,11 @@ static int ao_exec(lua_State *L){
 	
 	lua_gettable(L,LUA_REGISTRYINDEX);
 	lua_pop(L,1);
-	Lock_Mutex(&message_mutex);
+	pthread_mutex_lock(&a_message_mutex);
 	message m = peek(message_queue);
-	Lock_Mutex(&list_mutex);
+	pthread_mutex_lock(&list_mutex);
 	node n = find_in_id(active,get_msg_id(m));
-	Unlock_Mutex(&list_mutex);
+	pthread_mutex_unlock(&list_mutex);
 	if(in_id(n) == get_msg_id(m)){
 		m = peek_next(m);
 	}
@@ -363,7 +370,7 @@ static int ao_exec(lua_State *L){
 	return do_stuff(L,m,1);
 }
 
-int luaopen_activeobject(lua_State *L){
+LUALIB_API int luaopen_activeobject(lua_State *L){
 	
 	luaL_register(L,"activeobject",ao_main_functions);
 	
@@ -378,5 +385,9 @@ int luaopen_activeobject(lua_State *L){
 	return 0;
 }
 
+static int ao_exit(lua_State *L){
+	join_threads_to_exit();
+	return 0;
+}
 
 

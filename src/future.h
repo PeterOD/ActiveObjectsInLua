@@ -1,10 +1,15 @@
 #ifndef FUTURE_H
 #define FUTURE_H
-#include "ao.h"
+//#include "ao.h"
 #include "message.h"
-#include "lua.h"
+#include <lua.h>
 typedef struct future_t *future;
-
+typedef void * THREAD_RETURN_T;
+typedef int bool_t;
+#ifndef FALSE
+# define FALSE 0
+# define TRUE 1
+#endif
 
 
 /*meta table of future*/

@@ -3,6 +3,7 @@
 
 #include "activeobject.h"
 #include "lua.h"
+#include "message.h"
 typedef struct active_object *object;
 
 typedef enum{
@@ -45,14 +46,7 @@ void set_obj_status(object o, int stat);
 */
 int get_obj_status(object o);
 
-/*
-	Function:	create_obj_worker
-	
-	Parameters:	L - pointer to lua state
-				
-	Returns:	integer denoting number of elements from stack
-*/
-static int create_obj_worker(lua_State *L);
+
 
 /*
 	Function:	enqueue_object_message
@@ -66,6 +60,17 @@ static int create_obj_worker(lua_State *L);
 
 
 void enqueue_object_message(object o);
+static int ao_create_object(lua_State *L);
+
+object create_object(const char *id, void *data);
+int get_obj_args(object o);
+void reset(object o, int rst);
+/*static int ao_send_message(lua_State *L); */
+
+
+
+/* child functions i.e. object.create_message("foo") */
+static int ao_create_message(lua_State *L);
 
 
 lua_State *obj_state(object o);
@@ -73,31 +78,24 @@ lua_State *obj_state(object o);
 void save_values(lua_State *from, lua_State *to);
 
 object return_object(lua_State *L);
+static int ao_kernel_worker(lua_State *L);
+static int ao_queue_size(lua_State *L);
 
 static int function_ready(lua_State *L, message m);
 static int do_stuff(lua_State *shared, message m, int index);
-/**********************
- * 	C API
- **********************/
-static int ao_create_object(lua_State *L);
-
-object create_object(const char *id, void *data);
-int get_obj_args(object o);
-void reset(object o, int rst);
-
-
-/* child functions i.e. object.create_message("foo") */
-static int ao_create_message(lua_State *L);
-
-static int ao_send_msg(lua_State *L);
-
-static int ao_kernel_worker(lua_State *L);
-
-static int ao_queue_size(lua_State *L);
-
 static int ao_exec(lua_State *L);
 
 
+
+/*static int ao_send_message(lua_State *L); */
+
+
+
+
+
+
+
+static int ao_exit(lua_State *L);
 
 
 #endif

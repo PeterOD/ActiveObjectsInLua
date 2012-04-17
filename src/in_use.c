@@ -1,4 +1,4 @@
-#include "ao.h"
+//#include "ao.h"
 #include "message.h"
 #include "in_use.h"
 #include <stdlib.h>
@@ -171,4 +171,5 @@ char *in_id(node n){
 		return n->id;
 	}
 	RAISE_ERROR("NODE EMPTY -- could not find id");
+	return n->id;
 }

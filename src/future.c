@@ -1,6 +1,6 @@
 #include "future.h"
 #include "message.h"
-#include "ao.h"
+//#include "ao.h"
 #include "lua.h"
 #include "lualib.h"
 #include "lauxlib.h"
@@ -8,11 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
-/*
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
-*/
 
 struct future_t{
 	 char *id;
@@ -51,6 +46,7 @@ bool_t is_not_done(future f){
 	if (f != NULL){
 		return f->done = FALSE;
 	}
+	return f->done = TRUE;
 }
 
 /* sets bool_t to TRUE */
@@ -58,18 +54,20 @@ bool_t completed(future f){
 	if(f != NULL){
 		return f->done = TRUE;
 	}
+	return f->done = FALSE;
 }
 
 bool_t check_status(future f){
-	bool_t check_it;
-	if(check_it = is_not_done(f)){
+	bool_t check_it = FALSE;
+	if(check_it == is_not_done(f)){
 		return check_it;
-	}else if(check_it = completed(f)){
+	}else if(check_it == completed(f)){
 		return check_it;
 	}
+	return check_it = is_not_done(f);
 }
 future add_to_future(  char* id, void *code,lua_State *L){
-	future f;
+	future f = init_future();
 	/* check if parameters are null */
 	if((f == NULL) || (id == NULL) || (code = NULL)){
 		RAISE_ERROR(" A Parameter is NULL ");
@@ -95,6 +93,7 @@ char *fut_id(future f){
 	if(f != NULL){
 		return f->id;
 	}
+	return f->id;
 } 
 
 void kill_future(future f){
@@ -105,6 +104,7 @@ void kill_future(future f){
 	/*close the future's lua state pointer */
 	lua_close(f->fut);
 	free(f);
+	f = NULL;
 
 }
 lua_State *get_fut(future f){

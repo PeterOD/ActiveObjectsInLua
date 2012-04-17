@@ -1,5 +1,5 @@
 #include "manager.h"
-#include "ao.h"
+//#include "ao.h"
 #include "message.h"
 #include "in_use.h"
 #include "activeobject.h"
@@ -13,22 +13,27 @@
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
+#include <pthread.h>
 
 
 
 
 /*********************************/
-AO_MUTEX_T state_access;
-/* message queue access */
-AO_MUTEX_T queue_access;
-/* in_use access */
-AO_MUTEX_T in_use_mutex;
 
+pthread_mutex_t state_access = PTHREAD_MUTEX_INITIALIZER;
+/* message queue access */
+//AO_MUTEX_T queue_access;
+pthread_mutex_t queue_access = PTHREAD_MUTEX_INITIALIZER;
+/* in_use access */
+/*AO_MUTEX_T in_use_mutex;*/
+pthread_mutex_t in_use_mutex = PTHREAD_MUTEX_INITIALIZER;
 /* mutex to decrement thread_count*/
-AO_MUTEX_T thread_count_mutex;
+/*AO_MUTEX_T thread_count_mutex;*/
+pthread_mutex_t thread_count_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* mutex to exit manager (join threads) */
-AO_MUTEX_T act_mutex;
+/*AO_MUTEX_T act_mutex;*/
+pthread_mutex_t act_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
 
@@ -46,14 +51,11 @@ lua_State *L;
 
 
 /* conditonal to wake thread */
-SIGNAL_T *wake_thread;
 
-#if defined (PLATFORM_LINUX)
-	/*conditional to allow the thread count of ZERO to be broadcast */
-	SIGNAL_T *no_tasks; 
-#else
-	//CONDITION_VARIABLE no_tasks;
-#endif
+pthread_cond_t wake_thread_t = PTHREAD_COND_INITIALIZER;
+pthread_cond_t no_tasks = PTHREAD_COND_INITIALIZER;
+
+
 
 int active_count = 0;
 
@@ -70,7 +72,7 @@ future f;
 	
 	#include <unistd.h>
 #endif
-
+/*
 int get_num_cores(){
 
 #if defined(PLATFORM_WIN32) || defined (PLATFORM_POCKETPC)
@@ -85,6 +87,7 @@ int get_num_cores(){
 #endif
 
 }
+*/
 #if defined(PLATFORM_WIN32) || defined (PLATFORM_POCKERPC)
 	static THREAD_RETURN_T __stdcall thread_loop(void *args)
 #else
@@ -97,33 +100,38 @@ int get_num_cores(){
 	node n;
 	char* tag;
 	int status;
-	int kill_worker;
 	/* worker thread loop */
 	while(1){
 		/*get access to message queue */
-		Lock_Mutex(&queue_access);
+		pthread_mutex_lock(&queue_access);
+		
+		while((in_use_count(active_tasks)== 0)&& (get_msg_count(message_queue) != 0)){
+			pthread_cond_wait(&wake_thread_t,&queue_access);
+		}
 		
 		m = pop_message(message_queue);
+	
 		/* confirm message retrieval */
 		if ( m != NULL){
 			/*get access to in_use_list */
-			Lock_Mutex(&in_use_mutex);
+			pthread_mutex_lock(&in_use_mutex);
 			tag = (char*)get_msg_id(m);
 			n = Create_Node(tag);
 			add_id(active_tasks,n);
 			/*release access to in_use_queue*/
-			Unlock_Mutex(&in_use_mutex);
+			pthread_mutex_unlock(&in_use_mutex);
 			
 			o = (object)message_code(m);
 		}
 		else{
 				/* unable to process code therefore
 					free access to message queue */
-					Unlock_Mutex(&queue_access);
+					pthread_mutex_unlock(&queue_access);
+					pthread_exit(NULL);
 			}
 		/* m was not null - free access to message queue ( T branch)*/
-		Unlock_Mutex(&queue_access);
-		
+	
+			pthread_mutex_unlock(&queue_access);
 		status = lua_resume(L,get_obj_args(o));
 		
 		reset(o,0);
@@ -131,19 +139,19 @@ int get_num_cores(){
 		/* if coroutine was executed successfully */
 		if(status == 0){
 			/* code has been executed so remove from in_use list */
-			Lock_Mutex(&in_use_mutex);
+			pthread_mutex_lock(&in_use_mutex);
 			kill_node(n);
-			Unlock_Mutex(&in_use_mutex);
+			pthread_mutex_unlock(&in_use_mutex);
 
 			
 			/*set object status to done*/
 			set_obj_status(o,object_thread_done);
 			
 			/* close shared state of object */
-			Lock_Mutex(&state_access);
+			pthread_mutex_lock(&state_access);
 			
 			lua_close(L);
-			Unlock_Mutex(&state_access);
+			pthread_mutex_unlock(&state_access);
 			
 			/* descrease the active process count */
 			object_count();
@@ -151,27 +159,22 @@ int get_num_cores(){
 		}
 		
 		/* check if thread yielded */
-		else if(status = LUA_YIELD){
+		else if(status == LUA_YIELD){
 			if(get_obj_status(o) == object_thread_waiting){
 				/* add code and id to future */
 				 f = create_future(get_msg_id(m),message_code(m));
 				 f = add_to_future(get_msg_id(m),message_code(m),(lua_State *)obj_state(o));
-		#if defined (PLATFORM_LINUX)		
-			SIGNAL_ONE(&no_tasks);
-		#else
-			/* win32 */
-
-		#endif
+		
 				/* destroy node stored on in_use list */
-				Lock_Mutex(&in_use_mutex);
+				pthread_mutex_lock(&in_use_mutex);
 				kill_node(n);
-				Unlock_Mutex(&in_use_mutex);
+				pthread_mutex_unlock(&in_use_mutex);
 			}
 			else{
 				/* thread has yielded re-insert into message queue
 						and remove from in_use queue
 						*/
-				Lock_Mutex(&queue_access);
+				pthread_mutex_lock(&queue_access);
 					/*check if message is in future */
 					if(get_msg_id(m) == fut_id(f)){
 						/* do not need future in this case as re-queuing the message */
@@ -179,30 +182,30 @@ int get_num_cores(){
 					}
 					
 				/* destroying node on in_use list does not destroy message*/
-				Lock_Mutex(&in_use_mutex);
+				pthread_mutex_lock(&in_use_mutex);
 				kill_node(n);
-				Unlock_Mutex(&in_use_mutex);				
+				pthread_mutex_unlock(&in_use_mutex);				
 				append_helper(message_queue,m);
-				Unlock_Mutex(&queue_access);
+				pthread_mutex_unlock(&queue_access);
 			
 			}
 		}
 		else{
 			/* check for lua side errors - run time, syntax etc this is bad*/
-			Lock_Mutex(&in_use_mutex);
+			pthread_mutex_lock(&in_use_mutex);
 			kill_node(n);
-			Unlock_Mutex(&in_use_mutex);
-			if(fut_id){
+			pthread_mutex_unlock(&in_use_mutex);
+			if(fut_id(f)){
 				kill_future(f);
 			}
-			Lock_Mutex(&queue_access);
+			pthread_mutex_lock(&queue_access);
 			remove_message(message_queue,m);
-			Unlock_Mutex(&queue_access);
+			pthread_mutex_unlock(&queue_access);
 			/*get access to shared lua state */
-			Lock_Mutex(&state_access);
+			pthread_mutex_lock(&state_access);
 			
 			lua_close((lua_State*)obj_state(o));
-			Unlock_Mutex(&state_access);
+			pthread_mutex_unlock(&state_access);
 			/* decrement amount of active objects */
 			object_count();
 		}
@@ -217,7 +220,7 @@ int init_manager(int initial_thread_count){
 	int startup;
 	int thread_count = 0;
 	
-	AO_THREAD_T worker;
+	pthread_t worker;
 	
 	/* intialise list and message queue */
 	active_tasks = init_in_list();
@@ -226,8 +229,10 @@ int init_manager(int initial_thread_count){
 	
 
 	for(startup = 0; startup < initial_thread_count; startup++){
-		Create_Thread(&worker,NULL,thread_loop,2);
-		thread_count++;
+		/*Create_Thread(&worker,NULL,thread_loop,2); */
+		if(pthread_create(&worker,NULL,thread_loop,NULL)==0){
+			thread_count++;
+		}
 	}
 	
 	if (thread_count != initial_thread_count){
@@ -243,42 +248,38 @@ int init_manager(int initial_thread_count){
 
 int create_worker(void){
 
-	AO_THREAD_T worker;
-	Create_Thread(&worker,NULL,thread_loop,2);
-	
-	return AO_MANAGET_INIT;
-
+	pthread_t worker;
+	if(pthread_create(&worker,NULL,thread_loop,NULL) !=0){
+		return AO_MANAGET_INIT;
+	}
+	return AO_MANAGET_INIT_FAIL;
 }
 
 void object_count(void){
-	Lock_Mutex(&thread_count_mutex);
+	pthread_mutex_lock(&thread_count_mutex);
 	active_count--;
 	if(active_count == 0){
-	#if defined (PLATFORM_WIN32) || defined (PLATFORM_POCKETPC)
-		/*WakeConditionVariable(&no_tasks); */
-	#else
-		SIGNAL_ONE(*no_tasks);
-	#endif
+		pthread_cond_signal( &no_tasks );
 	}
-	Unlock_Mutex(&thread_count_mutex);
+	pthread_mutex_unlock(&thread_count_mutex);
 }
 
 void object_count_incr(void){
-	Lock_Mutex(&thread_count_mutex);
+	pthread_mutex_lock(&thread_count_mutex);
 	active_count++;
-	Unlock_Mutex(&thread_count_mutex);
+	pthread_mutex_unlock(&thread_count_mutex);
 }
 void join_threads_to_exit(void){
-	Lock_Mutex(&act_mutex);
+	pthread_mutex_lock(&act_mutex);
 	int mcnt = get_msg_count(message_queue);
 	int icnt = in_use_count(active_tasks);
 	if((mcnt == 0) && (icnt == 0)){
-		Lock_Mutex(&queue_access);
+		pthread_mutex_lock(&queue_access);
 		empty_list = TRUE;
-		SIGNAL_ALL(&wake_thread);
-		Unlock_Mutex(&queue_access);
+		pthread_cond_broadcast(&wake_thread_t);
+		pthread_mutex_unlock(&queue_access);
 		
 	}
-	Unlock_Mutex(&act_mutex);
+	pthread_mutex_unlock(&act_mutex);
 	
 }
